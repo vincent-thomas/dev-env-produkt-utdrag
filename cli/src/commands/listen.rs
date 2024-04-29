@@ -1,14 +1,14 @@
+use anyhow::{anyhow, Result};
+use crossterm::style::Stylize;
 use std::{
     io::{BufRead, BufReader},
     process::{ChildStdout, Command, Stdio},
 };
 
-use anyhow::{anyhow, Result};
-
-#[derive(Debug)]
-struct Variable {
-    key: String,
-    value: String,
+#[derive(Debug, Copy, Clone)]
+pub struct Variable<'a> {
+    key: &'a str,
+    value: &'a str,
 }
 
 pub fn initial_command(args: String, envs: &[Variable]) -> Command {
@@ -27,15 +27,19 @@ pub fn initial_command(args: String, envs: &[Variable]) -> Command {
     command
 }
 
-pub fn inject_command(args: String) {
+pub fn inject_command(args: impl Into<String>) {
     let injected_environments = &[Variable {
-        key: "KEY_FROM_DATABASE".into(),
-        value: "VERY_SECRET_VALUE".into(),
+        key: "KEY_FROM_DATABASE",
+        value: "VERY_SECRET_VALUE",
     }];
 
-    let command = initial_command(args, injected_environments);
+    let command = initial_command(args.into(), injected_environments);
 
-    let _total_logs = stream_command(command, |line| println!("{}", line));
+    let stream_result = stream_command(command, |line| println!("{}", line));
+
+    if let Err(error) = stream_result {
+        println!("\n{} {}\n", " ERROR ".on_red().bold(), error);
+    }
 }
 
 fn stream_command<T>(mut cmd: Command, mut action: T) -> Result<Vec<String>>
@@ -51,14 +55,16 @@ where
             line
         })
         .collect::<Vec<String>>();
-
     Ok(stream)
 }
 
 fn capture_stdout(cmd: &mut Command) -> Result<ChildStdout> {
-    cmd.stdout(Stdio::piped())
+    let found_process = cmd
+        .stdout(Stdio::piped())
         .spawn()
-        .unwrap()
+        .map_err(|_| anyhow!("Failed to find command"))?;
+
+    found_process
         .stdout
         .ok_or_else(|| anyhow!("Failed to capture stdout"))
 }

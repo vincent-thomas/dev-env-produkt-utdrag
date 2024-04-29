@@ -1,25 +1,35 @@
 mod commands;
 
-use clap::{Args, Parser, Subcommand};
+use clier::{
+    builder::RCommand,
+    run::{ExitCode, Meta, Runnable},
+    Clier,
+};
 use commands::listen::inject_command;
 
-// #[derive(Debug, Parser)]
-// enum Testing {
-//     test,
-// }
-
-#[derive(Parser)]
-#[clap(name = "enver")]
-enum Cli {
-    // #[structopt(subcommand)]
-    Listen { command: String },
-    // Auth(Testing),
+fn inject_command_handler() -> RCommand {
+    RCommand::new(
+        "run",
+        "The command to use to run a command and inject variables",
+        |args| {
+            inject_command(args.args.after_dashes());
+            0
+        },
+    )
 }
 
-fn main() {
-    let result = Cli::parse();
-    match result {
-        Cli::Listen { command } => inject_command(command),
-        // Cli::Auth(_) => {}
-    };
+fn auth_login() -> RCommand {
+    RCommand::new("login", "To login", |_| 0)
+}
+
+fn main() -> Result<ExitCode, clier::error::Error> {
+    let meta =
+        Meta::new("enver", "Enver is a nice thing", "1.2.4").usage("<command> [--flags=value]");
+
+    let app = Clier::parse()
+        .meta(&meta)
+        .command(inject_command_handler())
+        .command(auth_login());
+
+    app.run()
 }
