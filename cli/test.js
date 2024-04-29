@@ -1,0 +1,1 @@
+console.log(process.env.KEY_FROM_DATABASE);
